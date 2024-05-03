@@ -10,17 +10,23 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       name: Checkout source code
-    - uses: hashicorp/setup-terraform@v3
-    - name: terraform init
-      run: terraform init
-    - name: terraform apply
-      run: terraform apply -auto-approve
+    # - uses: hashicorp/setup-terraform@v3
+    # - name: terraform init
+    #   run: terraform init
+    # - name: terraform apply
+    #   run: terraform apply -auto-approve
+    #   env:
+    #     TF_VAR_token: ${{ secrets.GH_TOKEN }}
+    #     TF_VAR_org: ${{ secrets.GH_ORG }}
     - name: Setup Atmos
-      uses: cloudposse/github-action-setup-atmos
+      uses: cloudposse/github-action-setup-atmos@v2
     - name: list stacks
       id: stacks
       run: |
-        echo "stacks={target: $(atmos describe stacks --format json | jq '. | keys') }" >> $GITHUB_OUTPUT
+        stacks=$(ls stacks/projects | cut -f1 -d "." | jq -R -s -c 'split("\n")[:-1]')
+        # ToDo: Checken warum das nicht klappt
+        #stacks=$(atmos list stacks  | jq -R -s -c 'split("\n")[:-1]')
+        echo "stacks=$(jq -cn --argjson stack "$stacks" '{target: $stack}')" >> $GITHUB_OUTPUT
   plan:
     needs: setup
     runs-on: ubuntu-20.04
@@ -28,4 +34,77 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.setup.outputs.stacks) }}
     steps:
-    - run: echo ${{matrix.target}}
+    - uses: actions/checkout@v3
+      name: Checkout source code
+    - name: Setup Atmos
+      uses: cloudposse/github-action-setup-atmos@v2
+    - uses: hashicorp/setup-terraform@v3
+    - name: Validate stack
+      run: atmos validate component test -s projects/${{matrix.target}}
+    - name: Install tfcmt
+      uses: jaxxstorm/action-install-gh-release@v1.11.0
+      with:
+        repo: suzuki-shunsuke/tfcmt
+        tag: v4.9.0
+    - name: Create markdown for comment
+      run: echo "# Plan for projects/${{matrix.target}}" > output.md
+    - name: Plan
+      run: tfcmt --output output.md plan -- atmos terraform plan test --stack projects/${{matrix.target}} -out=plan
+    - name: Add comment to pr
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GH_TOKEN }}
+        script: |
+          const fs = require('fs')
+          const result_file = fs.readFileSync('output.md', 'utf8')
+          const output = `
+            ${result_file}
+          `
+          const comment = await github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: output
+          })
+  apply:
+    needs:
+    - setup
+    - plan
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.stacks) }}
+    environment: ${{ matrix.target }}
+    steps:
+    - uses: actions/checkout@v3
+      name: Checkout source code
+    - name: Setup Atmos
+      uses: cloudposse/github-action-setup-atmos@v2
+    - uses: hashicorp/setup-terraform@v3
+    - name: Validate stack
+      run: atmos validate component test -s projects/${{matrix.target}}
+    # - name: Install tfcmt
+    #   uses: jaxxstorm/action-install-gh-release@v1.11.0
+    #   with:
+    #     repo: suzuki-shunsuke/tfcmt
+    #     tag: v4.9.0
+    # - name: Create markdown for comment
+    #   run: echo "# Plan for projects/${{matrix.target}}" > output.md
+    # - name: Plan
+    #   run: tfcmt --output output.md plan -- atmos terraform plan test --stack projects/${{matrix.target}} -out=plan
+    # - name: Add comment to pr
+    #   uses: actions/github-script@v7
+    #   with:
+    #     github-token: ${{ secrets.GH_TOKEN }}
+    #     script: |
+    #       const fs = require('fs')
+    #       const result_file = fs.readFileSync('output.md', 'utf8')
+    #       const output = `
+    #         ${result_file}
+    #       `
+    #       const comment = await github.rest.issues.createComment({
+    #         issue_number: context.issue.number,
+    #         owner: context.repo.owner,
+    #         repo: context.repo.repo,
+    #         body: output
+    #       })
