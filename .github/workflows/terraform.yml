@@ -1,0 +1,31 @@
+name: Terraform
+on:
+  pull_request:
+    
+jobs:
+  setup:
+    runs-on: ubuntu-20.04
+    outputs:
+      stacks: ${{ steps.stacks.outputs.stacks }}
+    steps:
+    - uses: actions/checkout@v3
+      name: Checkout source code
+    - uses: hashicorp/setup-terraform@v3
+    - name: terraform init
+      run: terraform init
+    - name: terraform apply
+      run: terraform apply -auto-approve
+    - name: Setup Atmos
+      uses: cloudposse/github-action-setup-atmos
+    - name: list stacks
+      id: stacks
+      run: |
+        echo "stacks={target: $(atmos describe stacks --format json | jq '. | keys') }" >> $GITHUB_OUTPUT
+  plan:
+    needs: setup
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.stacks) }}
+    steps:
+    - run: echo ${{matrix.target}}
