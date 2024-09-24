@@ -35,6 +35,8 @@ jobs:
       matrix: ${{ fromJson(needs.setup.outputs.stacks) }}
     steps:
     - name: setup envs
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: | 
         gh api --method PUT -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/DominikSchorn/atmos-test/environments/${{matrix.target}} -F "prevent_self_review=false"
         
