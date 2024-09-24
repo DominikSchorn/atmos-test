@@ -27,6 +27,20 @@ jobs:
         # ToDo: Checken warum das nicht klappt
         #stacks=$(atmos list stacks  | jq -R -s -c 'split("\n")[:-1]')
         echo "stacks=$(jq -cn --argjson stack "$stacks" '{target: $stack}')" >> $GITHUB_OUTPUT
+  setup-env:
+    needs: setup
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.stacks) }}
+    steps:
+    - name: setup envs
+      run: | 
+        gh api --method PUT -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28"
+        /repos/DominikSchorn/atmos-test/environments/${{matrix.target}} \
+        -F "prevent_self_review=false"
+        
   plan:
     needs: setup
     runs-on: ubuntu-20.04
