@@ -36,10 +36,7 @@ jobs:
     steps:
     - name: setup envs
       run: | 
-        gh api --method PUT -H "Accept: application/vnd.github+json" \
-        -H "X-GitHub-Api-Version: 2022-11-28"
-        /repos/DominikSchorn/atmos-test/environments/${{matrix.target}} \
-        -F "prevent_self_review=false"
+        gh api --method PUT -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/DominikSchorn/atmos-test/environments/${{matrix.target}} -F "prevent_self_review=false"
         
   plan:
     needs: setup
