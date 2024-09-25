@@ -96,9 +96,13 @@ jobs:
     - uses: hashicorp/setup-terraform@v3
     - name: Validate stack
       run: atmos validate component test -s projects/${{matrix.target}}
-    - name: exit
-      run: exit 1
-      if: ${{matrix.target}} == "foo"
+    - uses: chrnorm/deployment-action@v2
+      name: Create GitHub deployment
+      id: deployment
+      with:
+        token: ${{ secrets.GH_TOKEN }}
+        environment-url: http://my-app-url.com
+        environment: ${{matrix.target}}
     # - name: Install tfcmt
     #   uses: jaxxstorm/action-install-gh-release@v1.11.0
     #   with:
