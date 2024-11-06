@@ -10,23 +10,20 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       name: Checkout source code
-    # - uses: hashicorp/setup-terraform@v3
-    # - name: terraform init
-    #   run: terraform init
-    # - name: terraform apply
-    #   run: terraform apply -auto-approve
-    #   env:
-    #     TF_VAR_token: ${{ secrets.GH_TOKEN }}
-    #     TF_VAR_org: ${{ secrets.GH_ORG }}
-    # - name: Setup Atmos
-    #   uses: cloudposse/github-action-setup-atmos@v2
+    - uses: hashicorp/setup-terraform@v3
     - name: list stacks
       id: stacks
       run: |
-        stacks=$(ls stacks/projects | cut -f1 -d "." | jq -R -s -c 'split("\n")[:-1]')
-        # ToDo: Checken warum das nicht klappt
-        #stacks=$(atmos list stacks  | jq -R -s -c 'split("\n")[:-1]')
+        git fetch origin
+        all=$(git diff --name-only `git merge-base origin/main HEAD` | grep -v stacks/projects | wc -l)
+        if [[ $all == "0" ]]; then
+          stacks=$(ls stacks/projects | cut -f1 -d "." | jq -R -s -c 'split("\n")[:-1]')
+        else
+          stacks=$(git diff --name-only `git merge-base origin/main HEAD` | grep stacks/projects | cut -f3 -d"/" | jq -R -s -c 'split("\n")[:-1]')
+          echo $stacks >> $GITHUB_STEP_SUMMARY
+        fi
         echo "stacks=$(jq -cn --argjson stack "$stacks" '{target: $stack}')" >> $GITHUB_OUTPUT
+        echo "stacks=$(jq -cn --argjson stack "$stacks" '{target: $stack}')" >> $GITHUB_STEP_SUMMARY
   setup-env:
     needs: setup
     runs-on: ubuntu-20.04
@@ -39,18 +36,20 @@ jobs:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: | 
         gh api --method PUT -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/DominikSchorn/atmos-test/environments/${{matrix.target}}
-  dispatch:
-    needs: setup
-    runs-on: ubuntu-20.04
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.setup.outputs.stacks) }}
-    steps:
-    - name: setup envs
-      env:
-        GH_TOKEN: ${{ secrets.GH_TOKEN }}
-      run: |
-          gh workflow run dispatch.yml -f target=${{matrix.target}}
+  # dispatch:
+  #   needs: setup
+  #   runs-on: ubuntu-20.04
+  #   strategy:
+  #     fail-fast: false
+  #     matrix: ${{ fromJson(needs.setup.outputs.stacks) }}
+  #   steps:
+  #   - uses: actions/checkout@v3
+  #     name: Checkout source code
+  #   - name: dispatch
+  #     env:
+  #       GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  #     run: |
+  #         gh workflow run .github/workflows/dispatch.yml -f target=${{matrix.target}} --ref foo
   plan:
     needs: setup
     strategy:
@@ -59,5 +58,4 @@ jobs:
     uses: ./.github/workflows/terraform-ci.yml
     with:
       target: ${{matrix.target}}
-    # If you might want to use a secret in the build or test job then you would need to pass secrets, inherit disables secret isolation
     secrets: inherit

@@ -1,14 +1,12 @@
 terraform {
   required_providers {
-    github = {
-      source  = "integrations/github"
-      version = "~> 6.0"
+    random = {
+      source  = "hashicorp/random"
+      version = "3.6.3"
     }
   }
 }
 
-# Configure the GitHub Provider
-provider "github" {
-  owner = var.org
-  token = var.token
+provider "random" {
+  # Configuration options
 }
