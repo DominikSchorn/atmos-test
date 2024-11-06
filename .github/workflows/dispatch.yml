@@ -1,0 +1,58 @@
+name: dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        type: string
+        required: true
+jobs:
+  plan:
+    runs-on: ubuntu-20.04 
+    if: always()
+    steps:
+    - uses: actions/checkout@v3
+      name: Checkout source code
+    # - name: Setup Atmos
+    #   uses: cloudposse/github-action-setup-atmos@v2
+    # - uses: hashicorp/setup-terraform@v3
+    # - name: Validate stack
+    #   run: atmos validate component test -s projects/${{inputs.target}}
+    # - name: Install tfcmt
+    #   uses: jaxxstorm/action-install-gh-release@v1.11.0
+    #   with:
+    #     repo: suzuki-shunsuke/tfcmt
+    #     tag: v4.9.0
+    # - name: Create markdown for comment
+    #   run: echo "# Plan for projects/${{inputs.target}}" > output.md
+    # - name: Plan
+    #   run: tfcmt --output output.md plan -- atmos terraform plan test --stack projects/${{inputs.target}} -out=plan
+    # - name: Add comment to pr
+    #   uses: actions/github-script@v7
+    #   with:
+    #     github-token: ${{ secrets.GH_TOKEN }}
+    #     script: |
+    #       const fs = require('fs')
+    #       const result_file = fs.readFileSync('output.md', 'utf8')
+    #       const output = `
+    #         ${result_file}
+    #       `
+    #       const comment = await github.rest.issues.createComment({
+    #         issue_number: context.issue.number,
+    #         owner: context.repo.owner,
+    #         repo: context.repo.repo,
+    #         body: output
+    #       })
+  apply:
+    needs:
+    - plan
+    runs-on: ubuntu-20.04
+    environment: ${{ inputs.target }}
+    steps:
+    # - uses: actions/checkout@v3
+    #   name: Checkout source code
+    # - name: Setup Atmos
+    #   uses: cloudposse/github-action-setup-atmos@v2
+    # - uses: hashicorp/setup-terraform@v3
+    # - name: Validate stack
+    #   run: atmos validate component test -s projects/${{inputs.target}}
+    - run: exit 1
