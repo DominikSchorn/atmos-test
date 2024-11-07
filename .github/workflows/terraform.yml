@@ -56,5 +56,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
         env_ids=$(for i in $(jq .target <<< '${{ needs.setup.outputs.stacks}}' | tr -d "[" | tr -d '"' | tr -d "]" | tr -d ","); do gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/environments/$i | jq .id; done)
-        echo $env_ids >> $GITHUB_STEP_SUMMARY
+        pending=$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/pending_deployments | jq ".[].environment.id")
+        # Check if environemnt is ready to deploy
+        for id in $env_ids; do if [[ $(echo ${pending[@]} | grep -ow "$id" | wc -w) == "0" ]]; then exit 1; fi; done
         for id in $env_ids; do gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/pending_deployments -F "environment_ids[]=$id" -f "state=approved" -f "comment=Ship it!"; done
