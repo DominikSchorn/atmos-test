@@ -10,17 +10,17 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       name: Checkout source code
-    - uses: hashicorp/setup-terraform@v3
     - name: list stacks
       id: stacks
       run: |
         git fetch origin
-        all=$(git diff --name-only `git merge-base origin/main HEAD` | grep -v stacks/projects | wc -l)
-        if [[ $all == "0" ]]; then
+        all=$(git diff origin/main --name-only | grep -v stacks/projects | wc -l)
+        if [[ $all != "0" ]]; then
+          echo "all" >> $GITHUB_STEP_SUMMARY
           stacks=$(ls stacks/projects | cut -f1 -d "." | jq -R -s -c 'split("\n")[:-1]')
         else
-          stacks=$(git diff --name-only `git merge-base origin/main HEAD` | grep stacks/projects | cut -f3 -d"/" | jq -R -s -c 'split("\n")[:-1]')
-          echo $stacks >> $GITHUB_STEP_SUMMARY
+          stacks=$(git diff origin/main --name-only | grep stacks/projects | cut -f3 -d"/" | jq -R -s -c 'split("\n")[:-1]')
+          echo "projects" >> $GITHUB_STEP_SUMMARY
         fi
         echo "stacks=$(jq -cn --argjson stack "$stacks" '{target: $stack}')" >> $GITHUB_OUTPUT
         echo "stacks=$(jq -cn --argjson stack "$stacks" '{target: $stack}')" >> $GITHUB_STEP_SUMMARY
