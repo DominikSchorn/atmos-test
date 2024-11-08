@@ -1,3 +1,3 @@
 resource "random_pet" "foo" {
-  count = 5
+  count = 10
 }
