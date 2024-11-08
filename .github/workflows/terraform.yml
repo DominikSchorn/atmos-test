@@ -24,33 +24,20 @@ jobs:
         fi
         echo "stacks=$(jq -cn --argjson stack "$stacks" '{target: $stack}')" >> $GITHUB_OUTPUT
         echo "stacks=$(jq -cn --argjson stack "$stacks" '{target: $stack}')" >> $GITHUB_STEP_SUMMARY
-  setup-env:
-    needs: setup
-    runs-on: ubuntu-20.04
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.setup.outputs.stacks) }}
-    steps:
-    - name: setup envs
-      env:
-        GH_TOKEN: ${{ secrets.GH_TOKEN }}
-      run: | 
-        gh api --method PUT -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/DominikSchorn/atmos-test/environments/${{matrix.target}}
-  # dispatch:
+  # TODO: Makefile
+  # setup-env:
   #   needs: setup
   #   runs-on: ubuntu-20.04
   #   strategy:
   #     fail-fast: false
   #     matrix: ${{ fromJson(needs.setup.outputs.stacks) }}
   #   steps:
-  #   - uses: actions/checkout@v3
-  #     name: Checkout source code
-  #   - name: dispatch
+  #   - name: setup envs
   #     env:
   #       GH_TOKEN: ${{ secrets.GH_TOKEN }}
-  #     run: |
-  #         gh workflow run .github/workflows/dispatch.yml -f target=${{matrix.target}} --ref foo
-  plan:
+  #     run: | 
+  #       gh api --method PUT -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/DominikSchorn/atmos-test/environments/${{matrix.target}}
+  terraform:
     needs: setup
     strategy:
       fail-fast: false
@@ -59,3 +46,17 @@ jobs:
     with:
       target: ${{matrix.target}}
     secrets: inherit
+  apply-all:
+    needs: setup
+    runs-on: ubuntu-20.04
+    environment: all
+    steps:
+    - name: get deployment ids
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+      run: |
+        env_ids=$(for i in $(jq .target <<< '${{ needs.setup.outputs.stacks}}' | tr -d "[" | tr -d '"' | tr -d "]" | tr -d ","); do gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/environments/$i | jq .id; done)
+        pending=$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/pending_deployments | jq ".[].environment.id")
+        # Check if environemnt is ready to deploy
+        for id in $env_ids; do if [[ $(echo ${pending[@]} | grep -ow "$id" | wc -w) == "0" ]]; then exit 1; fi; done
+        for id in $env_ids; do gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/pending_deployments -F "environment_ids[]=$id" -f "state=approved" -f "comment=Ship it!"; done
